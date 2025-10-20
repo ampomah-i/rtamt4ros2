@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rtamt4ros2</name>
+  <version>0.1.0</version>
+  <description>RTAMT-based runtime monitoring framework for ROS 2</description>
+
+  <maintainer email="ia324@cornell.edu">Immanuel Ampomah Mensah</maintainer>
+  <author email="ia324@cornell.edu">Immanuel Ampomah Mensah</author>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>rtamt</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
