@@ -69,8 +69,7 @@ string formula
 - With inclusive bounds, `always[0,k]` spans `k+1` samples; violations are reported with a `k`-tick delay relative to the start of a violating run.
 
 ## Acknowledgments
-This work was conducted as part of the **Verifiable Robotics Group at Cornell University**, advised by **Prof. Hadas Kress-Gazit**. We thank the lab for foundational research on formal methods and runtime assurance that inspired this ROS 2 integration.
-
+This work was conducted as part of the **Verifiable Robotics Group at Cornell University**, advised by **Prof. Hadas Kress-Gazit**, and builds upon the original [**rtamt4ros**](https://github.com/nickovic/rtamt4ros) framework developed by **Nikolaos Nickovic**
 ## Maintainer
 **Immanuel Ampomah Mensah** — ia324@cornell.edu
 
