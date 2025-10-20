@@ -1,4 +1,4 @@
-# rtamt4ros2
+# rtamt4ros2 - Work in Progress
 
 Runtime monitoring for ROS 2 using [RTAMT](https://github.com/nickovic/rtamt).
 Evaluate Signal Temporal Logic (STL) specifications **online** on ROS 2 topics and publish robustness and boolean satisfaction.
