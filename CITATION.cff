@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: >-
+  If you use rtamt4ros2, please cite this software and the RTAMT article
+  listed under references.
+title: "rtamt4ros2: Online Signal Temporal Logic Monitoring for ROS 2"
+type: software
+authors:
+  - family-names: Mensah
+    given-names: Immanuel Ampomah
+version: 0.2.2
+date-released: 2026-07-23
+url: "https://github.com/ampomah-i/rtamt4ros2"
+repository-code: "https://github.com/ampomah-i/rtamt4ros2.git"
+license: MIT
+references:
+  - type: article
+    authors:
+      - family-names: Yamaguchi
+        given-names: Tomoya
+      - family-names: Hoxha
+        given-names: Bardh
+      - family-names: Nickovic
+        given-names: Dejan
+    title: >-
+      RTAMT - Runtime Robustness Monitors with Application to CPS and Robotics
+    journal: International Journal on Software Tools for Technology Transfer
+    year: 2024
+    volume: 26
+    issue: 5
+    start: 79
+    end: 99
+    doi: 10.1007/s10009-023-00720-3

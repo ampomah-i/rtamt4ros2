@@ -141,6 +141,17 @@ its PyPI-only runtime dependencies with their licenses. No network download is
 performed while building or running the package. See
 [`RELEASING.md`](RELEASING.md) for the source-tag and ROS build-farm process.
 
+## Citation
+
+If you use `rtamt4ros2`, cite this repository using
+[`CITATION.cff`](CITATION.cff) and cite the RTAMT method and implementation on
+which it depends:
+
+> Tomoya Yamaguchi, Bardh Hoxha, and Dejan Nickovic. “RTAMT—Runtime
+> Robustness Monitors with Application to CPS and Robotics.” *International
+> Journal on Software Tools for Technology Transfer* 26(5), 79–99 (2024).
+> https://doi.org/10.1007/s10009-023-00720-3
+
 ## License
 
 MIT
