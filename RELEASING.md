@@ -13,9 +13,9 @@ versions are vendored so release-farm builds do not access the network.
 5. Commit the release changes and create an annotated version tag:
 
    ```bash
-   git tag -a 0.2.0 -m "Release 0.2.0"
+   git tag -a X.Y.Z -m "Release X.Y.Z"
    git push origin main
-   git push origin 0.2.0
+   git push origin X.Y.Z
    ```
 
 ## First ROS distribution release

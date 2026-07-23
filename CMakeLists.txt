@@ -70,7 +70,10 @@ if(BUILD_TESTING)
   add_launch_test(tests/test_monitor_launch.py TIMEOUT 45)
 
   # Keep third-party vendored sources out of first-party style checks.
-  ament_flake8(rtamt4ros2 examples launch tests)
+  ament_flake8(
+    CONFIG_FILE tests/ament_flake8.ini
+    rtamt4ros2 examples launch tests
+  )
   ament_pep257(rtamt4ros2 examples launch tests)
   ament_xmllint(package.xml)
 endif()

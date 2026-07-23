@@ -9,15 +9,20 @@ from typing import Dict
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
+    QoSProfile,
+    QoSReliabilityPolicy,
+)
 
 from rosidl_runtime_py.utilities import get_message
-from rtamt4ros2.msg import Robustness
 from rtamt4ros2.monitor import (
+    extract_numeric_field,
     MonitorConfigurationError,
     OnlineStlMonitor,
-    extract_numeric_field,
 )
+from rtamt4ros2.msg import Robustness
 
 
 class StlMonitorNode(Node):

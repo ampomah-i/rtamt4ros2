@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import pytest
 
 from rtamt4ros2.monitor import (
+    extract_numeric_field,
     MonitorConfigurationError,
     OnlineStlMonitor,
-    extract_numeric_field,
 )
 
 ROOT = Path(__file__).parents[1]
