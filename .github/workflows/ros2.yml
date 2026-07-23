@@ -1,0 +1,30 @@
+name: ROS 2 CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    container:
+      image: ros:humble-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y python3-pip ros-humble-ament-cmake-pytest
+          python3 -m pip install "rtamt==0.3.5"
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --packages-select rtamt4ros2 --event-handlers console_direct+
+      - name: Test
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          colcon test --packages-select rtamt4ros2 --event-handlers console_direct+
+          colcon test-result --verbose

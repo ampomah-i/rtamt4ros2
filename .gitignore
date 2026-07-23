@@ -7,3 +7,7 @@ log/
 .dist/
 dist/
 *.zip
+.pytest_cache/
+.vscode/
+.venv/
+PanGPA.log

@@ -1,0 +1,14 @@
+stl_monitor:
+  ros__parameters:
+    formula: "out = always[0,5](x > 0.5)"
+    vars: ["x"]
+    input_topics: ["x"]
+    input_type: "std_msgs/msg/Float64"
+    input_types: []
+    input_fields: ["data"]
+    output_topic: "stl_monitor/output"
+    sampling_period: 0.1
+    sampling_unit: "s"
+    require_all_inputs: true
+    qos_reliability: "best_effort"
+    qos_depth: 10

@@ -1,331 +1,204 @@
 #!/usr/bin/env python3
-import ast
-import os
-from typing import Dict, Any, Callable, Optional
+"""ROS 2 node for online Signal Temporal Logic monitoring."""
+
+from functools import partial
+from math import isfinite
+from pathlib import Path
+from typing import Dict
+
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
-from std_msgs.msg import Float32, Float64, Bool, Int32
-from geometry_msgs.msg import Point, Pose, Twist, Vector3
+
+from rosidl_runtime_py.utilities import get_message
 from rtamt4ros2.msg import Robustness
-import rtamt
+from rtamt4ros2.monitor import (
+    MonitorConfigurationError,
+    OnlineStlMonitor,
+    extract_numeric_field,
+)
 
 
 class StlMonitorNode(Node):
-    """
-    Runtime STL monitor for ROS 2 with support for:
-    - File-based or inline specifications
-    - Flexible topic mapping (var name ≠ topic name)
-    - Multiple message types (Float32, Point, Pose, etc.)
-    - Dynamic frequency from spec
-    """
-    
-    # Supported message types
-    MESSAGE_TYPES = {
-        'Float32': Float32,
-        'Float64': Float64,
-        'Bool': Bool,
-        'Int32': Int32,
-        'Point': Point,
-        'Pose': Pose,
-        'Twist': Twist,
-        'Vector3': Vector3,
-    }
-    
     def __init__(self):
-        # Initialize with default name (may be overridden)
         super().__init__('stl_monitor_node')
-        
-        # ============= PARAMETERS =============
-        # Specification source (file or inline)
-        self.declare_parameter('formula_file', '')
-        self.declare_parameter('formula', 'out = always[0,5](x > 0.5)')
-        
-        # Variables and timing
-        self.declare_parameter('vars', ['x'])
-        self.declare_parameter('sampling_period', 0.1)
-        self.declare_parameter('sampling_unit', 's')
-        
-        # Topic mapping: {var_name: topic_name}
-        self.declare_parameter('topic_mapping', {})
-        
-        # Message types: {var_name: msg_type_string}
-        self.declare_parameter('var_types', {})
-        
-        # Field extraction for complex messages: {var_name: field_path}
-        # e.g., {'x': 'pose.position.x'} for Pose messages
-        self.declare_parameter('var_fields', {})
-        
-        # Monitoring options
-        self.declare_parameter('require_all_vars', True)
-        self.declare_parameter('publish_period', True)  # Publish every period even if no new data
-        
-        # QoS options
-        self.declare_parameter('qos_reliability', 'best_effort')
-        self.declare_parameter('qos_depth', 10)
-        
-        # ============= LOAD PARAMETERS =============
-        formula_file = self.get_parameter('formula_file').value
-        formula_inline = self.get_parameter('formula').value
-        vars_param = self.get_parameter('vars').value
-        sp = float(self.get_parameter('sampling_period').value)
-        unit = self.get_parameter('sampling_unit').value
-        
-        # Parse complex parameters
-        vars_ = self._parse_param(vars_param, list)
-        topic_mapping = self._parse_param(self.get_parameter('topic_mapping').value, dict)
-        var_types = self._parse_param(self.get_parameter('var_types').value, dict)
-        var_fields = self._parse_param(self.get_parameter('var_fields').value, dict)
-        
-        self.require_all = self.get_parameter('require_all_vars').value
-        self.publish_period = self.get_parameter('publish_period').value
-        
-        # ============= LOAD FORMULA =============
+
+        # Parameters
+        self.declare_parameter("formula", "out = always[0,5](x > 0.5)")
+        self.declare_parameter("formula_file", "")
+        self.declare_parameter("vars", ["x"])
+        self.declare_parameter("input_topics", Parameter.Type.STRING_ARRAY)
+        self.declare_parameter("input_type", "std_msgs/msg/Float64")
+        self.declare_parameter("input_types", Parameter.Type.STRING_ARRAY)
+        self.declare_parameter("input_fields", Parameter.Type.STRING_ARRAY)
+        self.declare_parameter("output_topic", "stl_monitor/output")
+        self.declare_parameter("sampling_period", 0.1)
+        self.declare_parameter("sampling_unit", "s")
+        self.declare_parameter("require_all_inputs", True)
+        self.declare_parameter("qos_reliability", "best_effort")
+        self.declare_parameter("qos_depth", 10)
+
+        def string_array_parameter(name):
+            fallback = Parameter(name, Parameter.Type.STRING_ARRAY, [])
+            return list(self.get_parameter_or(name, fallback).value)
+
+        formula = str(self.get_parameter("formula").value)
+        formula_file = str(self.get_parameter("formula_file").value)
+        variables = list(self.get_parameter("vars").value)
+        topics = string_array_parameter("input_topics")
+        default_input_type = str(self.get_parameter("input_type").value)
+        input_types = string_array_parameter("input_types")
+        input_fields = string_array_parameter("input_fields")
+        output_topic = str(self.get_parameter("output_topic").value)
+        sampling_period = float(self.get_parameter("sampling_period").value)
+        sampling_unit = str(self.get_parameter("sampling_unit").value)
+        self.require_all_inputs = bool(self.get_parameter("require_all_inputs").value)
+        reliability_name = str(self.get_parameter("qos_reliability").value)
+        qos_depth = int(self.get_parameter("qos_depth").value)
+
         if formula_file:
-            if not os.path.exists(formula_file):
-                raise FileNotFoundError(f"Formula file not found: {formula_file}")
-            
-            with open(formula_file, 'r') as f:
-                formula = f.read().strip()
-            self.get_logger().info(f"📄 Loaded formula from: {formula_file}")
-        elif formula_inline:
-            formula = formula_inline
-            self.get_logger().info(f"📝 Using inline formula")
-        else:
-            raise ValueError("Must provide either 'formula_file' or 'formula' parameter")
-        
-        # ============= INITIALIZE RTAMT =============
-        try:
-            spec = rtamt.StlDiscreteTimeSpecification()
-            
-            # Declare variables
-            for v in vars_:
-                spec.declare_var(v, 'float')
-            spec.declare_var('out', 'float')
-            
-            # Parse and pastify
-            spec.spec = formula
-            spec.parse()
-            spec.pastify()
-            spec.set_sampling_period(sp, unit)
-            
-            self.spec = spec
-            self.sampling_period = sp
-            self.sampling_unit = unit
-            self.frequency = spec.get_sampling_frequency()
-            
-            self.get_logger().info(f"✓ Formula parsed: {formula}")
-            self.get_logger().info(f"⏱  Sampling: {sp} {unit} ({self.frequency} Hz)")
-            
-        except rtamt.STLParseException as e:
-            self.get_logger().error(f"✗ STL Parse Exception: {e}")
-            raise
-        except Exception as e:
-            self.get_logger().error(f"✗ RTAMT initialization failed: {e}")
-            raise
-        
-        # ============= STATE TRACKING =============
-        self.vars: Dict[str, float] = {v: 0.0 for v in vars_}
-        self.vars_received: Dict[str, bool] = {v: False for v in vars_}
-        self.vars_timestamps: Dict[str, float] = {v: 0.0 for v in vars_}
-        self.tick = 0
-        self.last_update_time: Optional[rclpy.time.Time] = None
-        
-        # ============= QoS CONFIGURATION =============
-        qos_reliability_param = self.get_parameter('qos_reliability').value
-        qos_depth = self.get_parameter('qos_depth').value
-        
-        reliability = (QoSReliabilityPolicy.BEST_EFFORT 
-                      if qos_reliability_param == 'best_effort' 
-                      else QoSReliabilityPolicy.RELIABLE)
-        
+            path = Path(formula_file).expanduser()
+            try:
+                formula = path.read_text(encoding="utf-8").strip()
+            except OSError as exc:
+                raise MonitorConfigurationError(
+                    f"cannot read formula_file {formula_file!r}: {exc}"
+                ) from exc
+
+        if not topics:
+            topics = variables
+        if not input_types:
+            input_types = [default_input_type] * len(variables)
+        if not input_fields:
+            input_fields = ["data"] * len(variables)
+        for parameter_name, values in (
+            ("input_topics", topics),
+            ("input_types", input_types),
+            ("input_fields", input_fields),
+        ):
+            if len(values) != len(variables):
+                raise MonitorConfigurationError(
+                    f"{parameter_name} must be empty or have exactly one entry per variable"
+                )
+        if len(topics) != len(set(topics)):
+            raise MonitorConfigurationError("input_topics must be unique")
+        if qos_depth <= 0:
+            raise MonitorConfigurationError("qos_depth must be positive")
+        if reliability_name not in {"best_effort", "reliable"}:
+            raise MonitorConfigurationError(
+                "qos_reliability must be 'best_effort' or 'reliable'"
+            )
+        message_classes = []
+        for input_type in input_types:
+            try:
+                message_classes.append(get_message(input_type))
+            except (AttributeError, ModuleNotFoundError, ValueError) as exc:
+                raise MonitorConfigurationError(
+                    f"invalid input type {input_type!r}: {exc}"
+                ) from exc
+
+        self.monitor = OnlineStlMonitor(
+            formula, variables, sampling_period, sampling_unit
+        )
+        self.values: Dict[str, float] = {}
+
+        reliability = (
+            QoSReliabilityPolicy.BEST_EFFORT
+            if reliability_name == "best_effort"
+            else QoSReliabilityPolicy.RELIABLE
+        )
         qos_sub = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
             durability=QoSDurabilityPolicy.VOLATILE,
             reliability=reliability,
-            depth=qos_depth
+            depth=qos_depth,
         )
-        
         qos_pub = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            depth=1
+            reliability=reliability,
+            depth=1,
         )
-        
-        # ============= SUBSCRIPTIONS =============
-        self.subscribers = []
-        for v in vars_:
-            # Determine topic name
-            topic = topic_mapping.get(v, f'/{v}')
-            
-            # Determine message type
-            msg_type_str = var_types.get(v, 'Float32')
-            if msg_type_str not in self.MESSAGE_TYPES:
-                raise ValueError(f"Unsupported message type: {msg_type_str}")
-            msg_type = self.MESSAGE_TYPES[msg_type_str]
-            
-            # Determine field extraction
-            field_path = var_fields.get(v, None)
-            
-            # Create callback
-            callback = self._create_callback(v, msg_type_str, field_path)
-            
-            # Subscribe
-            sub = self.create_subscription(msg_type, topic, callback, qos_sub)
-            self.subscribers.append(sub)
-            
-            self.get_logger().info(
-                f"📡 Variable '{v}' ← topic '{topic}' "
-                f"(type: {msg_type_str}{f', field: {field_path}' if field_path else ''})"
+
+        self._input_subscriptions = [
+            self.create_subscription(
+                message_class,
+                topic,
+                partial(self._on_input, variable, field),
+                qos_sub,
             )
-        
-        # ============= PUBLISHER =============
-        self.pub = self.create_publisher(Robustness, '/stl_monitor/output', qos_pub)
-        
-        # ============= TIMER =============
-        timer_period = 1.0 / self.frequency  # Convert Hz to seconds
+            for variable, topic, message_class, field in zip(
+                variables, topics, message_classes, input_fields
+            )
+        ]
+
+        self.pub = self.create_publisher(Robustness, output_topic, qos_pub)
+
+        unit_seconds = {"s": 1.0, "ms": 1e-3, "us": 1e-6, "ns": 1e-9}
+        timer_period = sampling_period * unit_seconds[sampling_unit]
         self.timer = self.create_timer(timer_period, self._on_timer)
-        
-        self.get_logger().info(f"🚀 STL Monitor started!")
-    
-    def _parse_param(self, param_value: Any, expected_type: type) -> Any:
-        """Parse parameters that might be strings or actual types"""
-        if isinstance(param_value, str) and param_value:
-            try:
-                return ast.literal_eval(param_value)
-            except (ValueError, SyntaxError) as e:
-                self.get_logger().warn(f"Failed to parse '{param_value}': {e}")
-                return expected_type()
-        elif isinstance(param_value, expected_type):
-            return param_value
-        else:
-            return expected_type()
-    
-    def _create_callback(self, var_name: str, msg_type: str, field_path: Optional[str]) -> Callable:
-        """Create a callback function for a specific variable and message type"""
-        
-        def extract_value(msg):
-            """Extract float value from message based on type and field path"""
-            if msg_type in ['Float32', 'Float64']:
-                return float(msg.data)
-            elif msg_type == 'Bool':
-                return float(msg.data)
-            elif msg_type == 'Int32':
-                return float(msg.data)
-            elif msg_type == 'Point':
-                if field_path:
-                    return self._get_nested_attr(msg, field_path)
-                return float(msg.x)  # Default to x
-            elif msg_type == 'Pose':
-                if field_path:
-                    return self._get_nested_attr(msg, field_path)
-                return float(msg.position.x)  # Default
-            elif msg_type == 'Twist':
-                if field_path:
-                    return self._get_nested_attr(msg, field_path)
-                return float(msg.linear.x)  # Default
-            elif msg_type == 'Vector3':
-                if field_path:
-                    return self._get_nested_attr(msg, field_path)
-                return float(msg.x)  # Default
-            else:
-                raise ValueError(f"Unsupported message type: {msg_type}")
-        
-        def callback(msg):
-            try:
-                value = extract_value(msg)
-                self.vars[var_name] = value
-                self.vars_received[var_name] = True
-                self.vars_timestamps[var_name] = self.get_clock().now().nanoseconds / 1e9
-                
-                # Log first message
-                if not self.vars_received[var_name]:
-                    self.get_logger().info(f"✓ First message received for '{var_name}'", once=True)
-                    
-            except Exception as e:
-                self.get_logger().error(f"Error extracting value from {var_name}: {e}")
-        
-        return callback
-    
-    def _get_nested_attr(self, obj: Any, path: str) -> float:
-        """Get nested attribute using dot notation (e.g., 'pose.position.x')"""
-        attrs = path.split('.')
-        for attr in attrs:
-            obj = getattr(obj, attr)
-        return float(obj)
-    
-    def _on_timer(self):
-        """Periodic evaluation of STL specification"""
-        
-        # Check if we have all required data
-        if self.require_all and not all(self.vars_received.values()):
-            missing = [k for k, v in self.vars_received.items() if not v]
-            self.get_logger().warn(
-                f"⏳ Waiting for variables: {missing}", 
-                throttle_duration_sec=5.0
+        mappings = ", ".join(
+            f"{variable}={topic} ({input_type}:{field})"
+            for variable, topic, input_type, field in zip(
+                variables, topics, input_types, input_fields
+            )
+        )
+        self.get_logger().info(f"Started STL monitor: {formula}")
+        self.get_logger().info(
+            f"Inputs: {mappings}; sampling_period={sampling_period}{sampling_unit}"
+        )
+
+    def _on_input(self, name, field_path, msg):
+        try:
+            value = extract_numeric_field(msg, field_path)
+        except (AttributeError, TypeError, ValueError) as exc:
+            self.get_logger().error(
+                f"Cannot extract numeric field {field_path!r} for {name}: {exc}"
             )
             return
-        
-        # Check for timing jitter
-        current_time = self.get_clock().now()
-        if self.last_update_time is not None:
-            expected_dt = 1.0 / self.frequency
-            actual_dt = (current_time - self.last_update_time).nanoseconds / 1e9
-            if abs(actual_dt - expected_dt) > 0.05 * expected_dt:
-                self.get_logger().warn(
-                    f"⚠ Timer jitter: {actual_dt:.3f}s (expected {expected_dt:.3f}s)",
-                    throttle_duration_sec=10.0
-                )
-        self.last_update_time = current_time
-        
-        # Evaluate specification
+        if not isfinite(value):
+            self.get_logger().warning(f"Ignoring non-finite sample for {name}")
+            return
+        self.values[name] = value
+
+    def _on_timer(self):
+        missing = set(self.monitor.variables).difference(self.values)
+        if missing and self.require_all_inputs:
+            return
         try:
-            # Prepare data in RTAMT format: list of (name, value) tuples
-            data = list(self.vars.items())
-            
-            # Update specification
-            robustness = float(self.spec.update(self.tick, data))
-            
-            # Create and publish message
+            sample = {name: self.values.get(name, 0.0) for name in self.monitor.variables}
+            robustness = self.monitor.update(sample)
             msg = Robustness()
-            msg.stamp = current_time.to_msg()
+            msg.stamp = self.get_clock().now().to_msg()
             msg.robustness = robustness
-            msg.satisfied = (robustness >= 0.0)
-            msg.formula = self.spec.spec
-            
+            msg.satisfied = robustness >= 0.0
+            msg.formula = self.monitor.formula
             self.pub.publish(msg)
-            
-            # Log result
-            self.get_logger().info(
-                f"Tick {self.tick}: ρ={robustness:.3f}, "
-                f"{'✓ SAT' if robustness >= 0.0 else '✗ UNSAT'}",
-                throttle_duration_sec=1.0
-            )
-            
-            self.tick += 1
-            
-        except rtamt.RTAMTException as e:
-            self.get_logger().error(f"RTAMT evaluation error: {e}")
-        except Exception as e:
-            self.get_logger().fatal(f"Unexpected error: {e}")
-            raise
+        except Exception as exc:
+            self.get_logger().error(f"RTAMT update failed: {exc}")
 
 
 def main(args=None):
     rclpy.init(args=args)
-    
+    node = None
     try:
         node = StlMonitorNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"Fatal error: {e}")
+    except MonitorConfigurationError as exc:
+        rclpy.logging.get_logger("stl_monitor_node").fatal(str(exc))
+        raise
     finally:
-        if rclpy.ok():
-            rclpy.shutdown()
+        try:
+            if node is not None:
+                node.destroy_node()
+            if rclpy.ok():
+                rclpy.shutdown()
+        except KeyboardInterrupt:
+            pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
