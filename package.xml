@@ -7,6 +7,11 @@
   <maintainer email="ia324@cornell.edu">Immanuel Ampomah Mensah</maintainer>
   <author email="ia324@cornell.edu">Immanuel Ampomah Mensah</author>
   <license>MIT</license>
+  <license>BSD-3-Clause</license>
+
+  <url type="website">https://github.com/ampomah-i/rtamt4ros2</url>
+  <url type="repository">https://github.com/ampomah-i/rtamt4ros2.git</url>
+  <url type="bugtracker">https://github.com/ampomah-i/rtamt4ros2/issues</url>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
@@ -20,9 +25,13 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
   <exec_depend>ros2launch</exec_depend>
-  <exec_depend>rtamt</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_cmake_flake8</test_depend>
+  <test_depend>ament_cmake_pep257</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>launch_testing_ros</test_depend>
   <test_depend>python3-pytest</test_depend>
 
   <member_of_group>rosidl_interface_packages</member_of_group>

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """ROS 2 node for online Signal Temporal Logic monitoring."""
 
 from functools import partial

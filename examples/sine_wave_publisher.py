@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Publish a deterministic signal for the rtamt4ros2 example launch file."""
 
 import math

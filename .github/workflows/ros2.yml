@@ -6,25 +6,32 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    name: ROS 2 ${{ matrix.ros_distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ros_distro: [humble, jazzy, kilted, lyrical]
     container:
-      image: ros:humble-ros-base
+      image: ros:${{ matrix.ros_distro }}-ros-base
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
+        shell: bash
         run: |
           apt-get update
-          apt-get install -y python3-pip ros-humble-ament-cmake-pytest
-          python3 -m pip install "rtamt==0.3.5"
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y \
+            --rosdistro "${{ matrix.ros_distro }}"
       - name: Build
         shell: bash
         run: |
-          source /opt/ros/humble/setup.bash
+          source "/opt/ros/${{ matrix.ros_distro }}/setup.bash"
           colcon build --packages-select rtamt4ros2 --event-handlers console_direct+
       - name: Test
         shell: bash
         run: |
-          source /opt/ros/humble/setup.bash
+          source "/opt/ros/${{ matrix.ros_distro }}/setup.bash"
           source install/setup.bash
           colcon test --packages-select rtamt4ros2 --event-handlers console_direct+
           colcon test-result --verbose

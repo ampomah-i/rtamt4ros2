@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +9,8 @@ from rtamt4ros2.monitor import (
     OnlineStlMonitor,
     extract_numeric_field,
 )
+
+ROOT = Path(__file__).parents[1]
 
 
 def test_atomic_predicate_robustness_and_tick():
@@ -71,3 +74,9 @@ def test_nested_numeric_field_extraction():
 def test_invalid_sampling_unit_is_rejected():
     with pytest.raises(MonitorConfigurationError, match="sampling_unit"):
         OnlineStlMonitor("out = x", ["x"], 1.0, "minutes")
+
+
+def test_rtamt_is_loaded_from_the_vendored_source():
+    import rtamt
+
+    assert Path(rtamt.__file__).is_relative_to(ROOT / "vendor")

@@ -15,19 +15,21 @@ For ROS 1, see [`rtamt4ros`](https://github.com/nickovic/rtamt4ros).
 - No output before all required inputs have arrived
 - Timestamped robustness and satisfaction output
 - Unit-tested ROS-independent monitoring core
+- End-to-end launch test over real ROS topics
 - Launch file, YAML configuration, and runnable signal-source example
 
 ## Install and build
 
-The current RTAMT PyPI release is `0.3.5` and requires its matching ANTLR
-runtime. Use the system Python associated with your ROS installation:
+RTAMT 0.3.5 and its matching ANTLR 4.7 runtime are vendored into this package
+for reproducible ROS binary builds. Use the system Python associated with your
+ROS installation:
 
 ```bash
 sudo apt update
 sudo apt install ros-${ROS_DISTRO}-rclpy \
   ros-${ROS_DISTRO}-rosidl-runtime-py \
   ros-${ROS_DISTRO}-std-msgs \
-  python3-pip python3-venv
+  python3-venv
 
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
@@ -35,20 +37,20 @@ git clone https://github.com/VerifiableRobotics/rtamt4ros2.git
 cd ..
 source /opt/ros/${ROS_DISTRO}/setup.bash
 
-# Isolate RTAMT's ANTLR 4.7 dependency from other Python applications.
+# An optional virtual environment keeps other development tools isolated.
 /usr/bin/python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
-python -m pip install "rtamt==0.3.5"
 
 colcon build --packages-select rtamt4ros2 --symlink-install
 source install/setup.bash
 ```
 
-Keep the virtual environment activated when building or running the package.
-Avoid Conda or an interpreter that differs from the one used by ROS 2; binary
-`rclpy` extensions are tied to that interpreter. If your user site contains
-ROS 1 packages such as `py3rosmsgs`, run `export PYTHONNOUSERSITE=1` before
-activating the environment so they cannot shadow ROS 2 interfaces.
+Keep the virtual environment activated while using development tools. Installed
+ROS executables explicitly use the system Python so a Conda, Homebrew, or other
+incompatible interpreter earlier on `PATH` cannot load the wrong `rclpy`
+extension. If your user site contains ROS 1 packages such as `py3rosmsgs`, run
+`export PYTHONNOUSERSITE=1` before activating the environment so they cannot
+shadow ROS 2 interfaces.
 
 ## Run the example
 
@@ -134,12 +136,10 @@ colcon test-result --verbose
 
 ## Binary-release status
 
-The source package is structured for Bloom and includes a changelog. A ROS
-binary release still requires an accepted rosdep key (or a separate ROS release)
-for the third-party `rtamt` Python dependency. Until that exists, install RTAMT
-from PyPI before building. After the dependency is resolvable through rosdep,
-the remaining release steps are creating a release repository, running Bloom,
-and submitting the generated rosdistro pull request.
+The source package is structured for Bloom, includes a changelog, and vendors
+its PyPI-only runtime dependencies with their licenses. No network download is
+performed while building or running the package. See
+[`RELEASING.md`](RELEASING.md) for the source-tag and ROS build-farm process.
 
 ## License
 

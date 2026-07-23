@@ -1,7 +1,7 @@
 """ROS-independent online STL monitoring primitives."""
 
 from math import isfinite
-from typing import Dict, Iterable, Mapping, Optional, Sequence
+from typing import Dict, Iterable, Mapping, Sequence
 
 import rtamt
 
@@ -86,7 +86,10 @@ class OnlineStlMonitor:
                 details.append(f"missing: {', '.join(sorted(missing))}")
             if extra:
                 details.append(f"unknown: {', '.join(sorted(extra))}")
-            raise ValueError("sample variables do not match the specification (" + "; ".join(details) + ")")
+            detail = "; ".join(details)
+            raise ValueError(
+                f"sample variables do not match the specification ({detail})"
+            )
 
         sample: Dict[str, float] = {}
         for name in self.variables:
