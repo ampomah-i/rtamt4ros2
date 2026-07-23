@@ -2,6 +2,11 @@
 Changelog for package rtamt4ros2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.2.2 (2026-07-23)
+------------------
+* Keep the first-party lint baseline stable on Kilted and Lyrical.
+* Contributors: Immanuel Ampomah Mensah
+
 0.2.1 (2026-07-23)
 ------------------
 * Pin a stable first-party flake8 configuration across ROS 2 distributions.
